@@ -1,4 +1,4 @@
-FROM node:lpine 3.16
+FROM node:alpine 3.16
 
 COPY package.json, main.js /
 
