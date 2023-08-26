@@ -1,0 +1,148 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+      "VpcId": {
+          "Type": "AWS::EC2::VPC::Id",
+          "Description": "Select a VPC that allows instances to access the Internet."
+      },
+      "SubnetId": {
+          "Type": "List<AWS::EC2::Subnet::Id>",
+          "Description": "Select at least two subnets in your selected VPC."
+      }
+  },
+  "Resources": {
+      "MountTargetVPC": {
+          "Type": "AWS::EC2::VPC",
+          "Properties": {
+              "VpcId": {
+                  "Ref": "VpcId"
+              },
+              "FileSystemTags": "Strapi-File Sys"
+          }
+      },
+      "MountTargetSubnetOne": {
+          "Type": "AWS::EC2::Subnet",
+          "Properties": {
+              "Subnets": {
+                  "Ref": "SubnetId"
+              },
+              "VpcId": {
+                  "Ref": "VpcId"
+              },
+              "AvailabilityZone": "US-Gov-West-1a"
+          }
+      },
+      "MountTargetSubnetTwo": {
+          "Type": "AWS::EC2::Subnet",
+          "Properties": {
+              "Subnets": {
+                  "Ref": "SubnetId"
+              },
+              "VpcId": {
+                  "Ref": "VpcId"
+              },
+              "AvailabilityZone": "US-Gov-West-1b"
+          }
+      },
+      "FileSystemResource": {
+          "Type": "AWS::EFS::FileSystem",
+          "Properties": {
+              "PerformanceMode": "maxIO",
+              "LifecyclePolicies": [
+                  {
+                      "TransitionToIA": "AFTER_30_DAYS"
+                  },
+                  {
+                      "TransitionToPrimaryStorageClass": "AFTER_1_ACCESS"
+                  }
+              ],
+              "Encrypted": true,
+              "FileSystemTags": [
+                  {
+                      "Key": "Name",
+                      "Value": "Aero-FileSystem"
+                  }
+              ],
+              "FileSystemPolicy": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                      {
+                          "Effect": "Allow",
+                          "Principal": {
+                              "AWS": "arn:aws:iam::306251499781:role/EfsReadOnly"
+                          },
+                          "Action": [
+                              "elasticfilesystem:ClientMount"
+                          ]
+                      }
+                  ]
+              },
+              "BackupPolicy": {
+                  "Status": "ENABLED"
+              }
+          }
+      },
+      "Policy": {
+          "Version": "2012-10-17",
+          "Id": "Policy01",
+          "Statement": [
+              {
+                  "Sid": "Statement",
+                  "Effect": "Allow",
+                  "Principal": {
+                      "AWS": "*"
+                  },
+                  "Resource": "filesystem-ID",
+                  "Action": [
+                      "elasticfilesystem:ClientMount",
+                      "elasticfilesystem:ClientRootAccess",
+                      "elasticfilesystem:ClientWrite"
+                  ],
+                  "Condition": {
+                      "Bool": {
+                          "aws:SecureTransport": "false"
+                      }
+                  }
+              }
+          ]
+      },
+      "Type": "AWS::EFS::AccessPoint",
+      "Properties": {
+          "AccessPointTags": {
+              "Key": "Name",
+              "Value": "Strapi-Access"
+          },
+          "ClientToken": "String",
+          "FileSystemId": "String",
+          "RootDirectory": "RootDirectory"
+      },
+      "ECSService": {
+          "Type": "AWS::ECS::Service",
+          "Properties": {
+              "Cluster": {
+                  "Ref": "ECSCluster"
+              },
+              "EnableExecuteCommand": "true",
+              "LaunchType": "EC2",
+              "TaskDefinition": {
+                  "Ref": "ECSTaskDefinition"
+              },
+              "LoadBalancers": {
+                  "TargetGroupArn": {
+                      "Ref": "arn:aws-us-gov:elasticloadbalancing:us-gov-west-1:306251499781:targetgroup/aero-wmd-apis/abaa326f368ad26a"
+                  },
+                  "ContainerPort": "80",
+                  "ContainerName": "Strapi-app",
+                  "Subnets": {
+                      "Ref": "SubnetId"
+                  },
+                  "SecurityGroups": "sg-095323ce843ffea89",
+                  "TargetGroupTags": {
+                      "Key": "Name",
+                      "Value": "Strapi-TagetGroup"
+                  }
+              }
+          }
+      }
+  }
+}
